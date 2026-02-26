@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from tests.conftest import make_context
-
 from alphaa.core.conditions import condition
 from alphaa.core.strategy import Strategy
 from alphaa.core.types import Context
+from tests.conftest import make_context
 
 
 @condition

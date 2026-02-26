@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from tests.conftest import make_context
-
 from alphaa.core.conditions import ConditionBase, _And, _Not, _Or, condition
 from alphaa.core.types import Context
+from tests.conftest import make_context
 
 
 @condition
