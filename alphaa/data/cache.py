@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from alphaa.core.types import DateRange
+
+if TYPE_CHECKING:
+    from alphaa.core.protocols import DataProvider
 
 
 class CachingProvider:
@@ -17,7 +21,7 @@ class CachingProvider:
 
     def __init__(
         self,
-        inner: object,
+        inner: DataProvider,
         cache_dir: str = "~/.alphaa/cache",
     ) -> None:
         self._inner = inner
@@ -34,9 +38,9 @@ class CachingProvider:
         if path.exists():
             return pd.read_csv(path, index_col=0, parse_dates=True)
 
-        df: pd.DataFrame = self._inner.fetch_ohlcv(symbol, date_range)  # type: ignore[union-attr]
+        df = self._inner.fetch_ohlcv(symbol, date_range)
         df.to_csv(path)
         return df
 
     def fetch_symbols(self, index: str | None = None) -> list[str]:
-        return self._inner.fetch_symbols(index)  # type: ignore[union-attr]
+        return self._inner.fetch_symbols(index)

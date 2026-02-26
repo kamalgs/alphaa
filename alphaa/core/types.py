@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, NamedTuple
 import pandas as pd
 
 if TYPE_CHECKING:
+    from alphaa.core.protocols import Broker, CostModel, DataProvider
     from alphaa.core.strategy import Strategy
 
 
@@ -207,9 +208,9 @@ class BacktestConfig:
     symbol: str
     date_range: DateRange
     starting_capital: float = 100_000.0
-    data_provider: object | None = None  # DataProvider protocol
-    broker: object | None = None  # Broker protocol
-    cost_model: object | None = None  # CostModel protocol
+    data_provider: DataProvider | None = None
+    broker: Broker | None = None
+    cost_model: CostModel | None = None
     benchmark_symbol: str | None = None
 
 

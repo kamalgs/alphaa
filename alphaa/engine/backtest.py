@@ -41,7 +41,7 @@ class BacktestEngine:
         strategy = config.strategy
 
         # --- Fetch data ---
-        ohlcv = provider.fetch_ohlcv(config.symbol, config.date_range)  # type: ignore[union-attr]
+        ohlcv = provider.fetch_ohlcv(config.symbol, config.date_range)
 
         # --- Pre-compute indicators ---
         indicators: dict[str, pd.Series] = {}
@@ -97,10 +97,10 @@ class BacktestEngine:
                 quantity = int(portfolio.cash // bar.close)
                 if quantity > 0:
                     order = Order(symbol=symbol, side=Side.BUY, quantity=quantity)
-                    fees = cost_model.compute_fees(order, bar.close)  # type: ignore[union-attr]
+                    fees = cost_model.compute_fees(order, bar.close)
                     if isinstance(broker, PaperBroker):
                         broker.set_fees(fees)
-                    fill = broker.place_order(order)  # type: ignore[union-attr]
+                    fill = broker.place_order(order)
 
                     # Update portfolio
                     portfolio.cash -= fill.price * fill.quantity + fill.fees
@@ -116,10 +116,10 @@ class BacktestEngine:
             elif symbol in portfolio.positions and strategy.exit(ctx):
                 pos = portfolio.positions[symbol]
                 order = Order(symbol=symbol, side=Side.SELL, quantity=pos.quantity)
-                fees = cost_model.compute_fees(order, bar.close)  # type: ignore[union-attr]
+                fees = cost_model.compute_fees(order, bar.close)
                 if isinstance(broker, PaperBroker):
                     broker.set_fees(fees)
-                fill = broker.place_order(order)  # type: ignore[union-attr]
+                fill = broker.place_order(order)
 
                 # Record trade
                 if pending_entry is not None:

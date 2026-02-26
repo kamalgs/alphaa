@@ -23,12 +23,12 @@ def plot_equity_curve(
 
     dates = [snap.date for snap in result.equity_curve]
     values = [snap.total_value for snap in result.equity_curve]
-    ax.plot(dates, values, label=result.strategy_name, linewidth=1.5)
+    ax.plot(dates, values, label=result.strategy_name, linewidth=1.5)  # type: ignore[arg-type]
 
     if result.benchmark_curve:
         bm_dates = [snap.date for snap in result.benchmark_curve]
         bm_values = [snap.total_value for snap in result.benchmark_curve]
-        ax.plot(bm_dates, bm_values, label="Buy & Hold", linewidth=1.5, linestyle="--")
+        ax.plot(bm_dates, bm_values, label="Buy & Hold", linewidth=1.5, linestyle="--")  # type: ignore[arg-type]
 
     ax.set_title(f"{result.strategy_name} — {result.symbol}")
     ax.set_xlabel("Date")
@@ -54,14 +54,14 @@ def plot_trades_on_price(
 
     for trade in result.trade_log:
         ax.plot(
-            trade.entry.date,
+            trade.entry.date,  # type: ignore[arg-type]
             trade.entry.price,
             "^",
             color="green",
             markersize=8,
         )
         ax.plot(
-            trade.exit.date,
+            trade.exit.date,  # type: ignore[arg-type]
             trade.exit.price,
             "v",
             color="red",

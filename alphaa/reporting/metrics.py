@@ -121,7 +121,7 @@ def _compute_sharpe(equity: list, risk_free_rate: float = 0.0) -> float:  # type
         return 0.0
 
     daily_sharpe = (mean_return - risk_free_rate / 252) / std_return
-    return daily_sharpe * math.sqrt(252)
+    return float(daily_sharpe * math.sqrt(252))
 
 
 def _empty_metrics(total_trades: int, benchmark: list) -> BacktestMetrics:  # type: ignore[type-arg]
