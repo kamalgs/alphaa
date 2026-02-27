@@ -12,16 +12,14 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from alphaa.broker.paper import PaperBroker
-from alphaa.conditions.position import has_no_position, has_position, stop_loss
-from alphaa.conditions.price import price_near_52w_high, price_near_52w_low
 from alphaa.core.strategy import Strategy
 from alphaa.core.types import BacktestConfig, BacktestMetrics, BacktestResult, DateRange
 from alphaa.data.cache import CachingProvider
 from alphaa.data.yahoo import YahooFinanceProvider
 from alphaa.engine.backtest import BacktestEngine
 from alphaa.engine.cost_models import ZeroCostModel
-from alphaa.indicators.price import rolling_high, rolling_low
 from alphaa.reporting.metrics import compute_metrics
+from alphaa.strategies.builtin import build_default_strategy
 
 if TYPE_CHECKING:
     from alphaa.core.protocols import DataProvider
@@ -53,11 +51,14 @@ class BacktestResponse:
 def run_backtest(
     request: BacktestRequest,
     data_provider: DataProvider | None = None,
+    strategy: Strategy | None = None,
 ) -> BacktestResponse:
     """Run a full backtest and return result + metrics.
 
     If *data_provider* is ``None``, a Yahoo Finance provider (optionally
     wrapped with caching) is created automatically.
+
+    If *strategy* is ``None``, the default buy-low-sell-high strategy is used.
     """
     if data_provider is None:
         yahoo: DataProvider = YahooFinanceProvider()
@@ -69,16 +70,12 @@ def run_backtest(
 
     date_range = DateRange(request.start_date, request.end_date)
 
-    strategy = Strategy(
-        name="buy-low-sell-high",
-        entry=price_near_52w_low(within_pct=request.entry_pct) & has_no_position(),
-        exit=(
-            price_near_52w_high(within_pct=request.exit_pct)
-            | stop_loss(pct=request.stop_loss_pct)
+    if strategy is None:
+        strategy = build_default_strategy(
+            entry_pct=request.entry_pct,
+            exit_pct=request.exit_pct,
+            stop_loss_pct=request.stop_loss_pct,
         )
-        & has_position(),
-        indicators=[rolling_high(252), rolling_low(252)],
-    )
 
     config = BacktestConfig(
         strategy=strategy,
