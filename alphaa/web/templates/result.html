@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Result — {{ run.symbol }} — AlphaA{% endblock %}
+
+{% block content %}
+<h1>{{ run.symbol }} — {{ run.strategy_name }}</h1>
+<p>{{ run.start_date }} to {{ run.end_date }} | Capital: {{ "{:,.0f}".format(run.capital) }}</p>
+
+<div class="metrics-grid">
+    <div class="metric-card">
+        <small>Total Return</small>
+        <strong class="{{ 'positive' if run.total_return_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.total_return_pct) }}%</strong>
+    </div>
+    <div class="metric-card">
+        <small>CAGR</small>
+        <strong class="{{ 'positive' if run.cagr_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.cagr_pct) }}%</strong>
+    </div>
+    <div class="metric-card">
+        <small>Max Drawdown</small>
+        <strong>{{ "{:.2f}".format(run.max_drawdown_pct) }}%</strong>
+    </div>
+    <div class="metric-card">
+        <small>Sharpe Ratio</small>
+        <strong>{{ "{:.2f}".format(run.sharpe_ratio) }}</strong>
+    </div>
+    <div class="metric-card">
+        <small>Win Rate</small>
+        <strong>{{ "{:.1f}".format(run.win_rate_pct) }}%</strong>
+    </div>
+    <div class="metric-card">
+        <small>Total Trades</small>
+        <strong>{{ run.total_trades }}</strong>
+    </div>
+    <div class="metric-card">
+        <small>Avg Holding</small>
+        <strong>{{ "{:.0f}".format(run.avg_holding_days) }} days</strong>
+    </div>
+    <div class="metric-card">
+        <small>Profit Factor</small>
+        <strong>{{ "{:.2f}".format(run.profit_factor) }}</strong>
+    </div>
+    {% if run.benchmark_return_pct is not none %}
+    <div class="metric-card">
+        <small>Benchmark Return</small>
+        <strong class="{{ 'positive' if run.benchmark_return_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.benchmark_return_pct) }}%</strong>
+    </div>
+    {% endif %}
+</div>
+
+{% if equity_chart_filename %}
+<h2>Equity Curve</h2>
+<img src="/static/{{ equity_chart_filename }}" alt="Equity curve" style="max-width:100%;">
+{% endif %}
+
+{% if trades_chart_filename %}
+<h2>Trades on Price</h2>
+<img src="/static/{{ trades_chart_filename }}" alt="Trades chart" style="max-width:100%;">
+{% endif %}
+
+<p><a href="/leaderboard">View Leaderboard</a></p>
+{% endblock %}

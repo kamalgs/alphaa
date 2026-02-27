@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}AlphaA{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        nav ul li a[aria-current="page"] { font-weight: bold; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .metric-card { padding: 1rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); }
+        .metric-card small { display: block; color: var(--pico-muted-color); }
+        .metric-card strong { font-size: 1.4rem; }
+        .positive { color: green; }
+        .negative { color: red; }
+    </style>
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul><li><strong>AlphaA</strong></li></ul>
+        <ul>
+            <li><a href="/" {% if active_page == "index" %}aria-current="page"{% endif %}>New Backtest</a></li>
+            <li><a href="/leaderboard" {% if active_page == "leaderboard" %}aria-current="page"{% endif %}>Leaderboard</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="container">
+        <small>AlphaA — Algo trading platform for Indian equities</small>
+    </footer>
+</body>
+</html>
