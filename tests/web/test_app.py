@@ -9,10 +9,11 @@ from unittest.mock import patch
 import pandas as pd
 from fastapi.testclient import TestClient
 
+from alphaa.core.strategy import Strategy
 from alphaa.core.types import DateRange
 from alphaa.service.backtest_service import BacktestRequest, BacktestResponse, run_backtest
 from alphaa.web.app import create_app
-from alphaa.web.db import get_db, save_run
+from alphaa.web.db import get_db, save_run, save_strategy
 
 FIXTURE_PATH = Path(__file__).parent.parent / "data" / "fixtures" / "RELIANCE_NS_2019_2024.csv"
 
@@ -34,7 +35,7 @@ def _make_client(tmp_path: Path) -> TestClient:
     """Create a TestClient with a tmp_path DB and fixture data provider."""
     db_path = tmp_path / "test.db"
     static_dir = tmp_path / "static"
-    static_dir.mkdir()
+    static_dir.mkdir(exist_ok=True)
 
     app = create_app()
 
@@ -82,6 +83,17 @@ def _seed_run(tmp_path: Path, symbol: str = "RELIANCE.NS", cagr: float = 12.5) -
     return run_id
 
 
+VALID_STRATEGY_SOURCE = """\
+def build_strategy(**params):
+    return Strategy(
+        name="test-custom",
+        entry=price_near_52w_low(within_pct=params.get("pct", 5.0)) & has_no_position(),
+        exit=has_position(),
+        indicators=[rolling_high(252), rolling_low(252)],
+    )
+"""
+
+
 class TestGetIndex:
     def test_returns_200(self, tmp_path: Path) -> None:
         client = _make_client(tmp_path)
@@ -100,8 +112,9 @@ class TestPostRun:
         def patched_run(
             request: BacktestRequest,
             data_provider: object = None,
+            strategy: Strategy | None = None,
         ) -> BacktestResponse:
-            return original_run(request, data_provider=provider)
+            return original_run(request, data_provider=provider, strategy=strategy)
 
         with patch("alphaa.web.routes.run_backtest", side_effect=patched_run), \
              patch("alphaa.web.routes.STATIC_DIR", tmp_path / "static"):
@@ -112,15 +125,70 @@ class TestPostRun:
                     "start": "2019-01-01",
                     "end": "2024-01-01",
                     "capital": "100000",
-                    "entry_pct": "5",
-                    "exit_pct": "5",
-                    "stop_loss": "10",
+                    "strategy_id": "builtin",
+                    "strategy_params": "{}",
                 },
                 follow_redirects=False,
             )
 
         assert resp.status_code == 303
         assert resp.headers["location"].startswith("/result/")
+
+    def test_invalid_json_params_shows_error(self, tmp_path: Path) -> None:
+        client = _make_client(tmp_path)
+        resp = client.post(
+            "/run",
+            data={
+                "symbol": "RELIANCE.NS",
+                "start": "2019-01-01",
+                "end": "2024-01-01",
+                "capital": "100000",
+                "strategy_id": "builtin",
+                "strategy_params": "{bad json",
+            },
+        )
+        assert resp.status_code == 200
+        assert "Invalid strategy params JSON" in resp.text
+
+    def test_run_with_custom_strategy(self, tmp_path: Path) -> None:
+        # Set up: save strategy file and DB record
+        strat_dir = tmp_path / "strategies"
+        strat_dir.mkdir()
+        (strat_dir / "custom.py").write_text(VALID_STRATEGY_SOURCE)
+
+        conn = get_db(tmp_path / "test.db")
+        sid = save_strategy(conn, name="Custom", filename="custom.py")
+        conn.close()
+
+        client = _make_client(tmp_path)
+        provider = FixtureProvider(FIXTURE_PATH)
+
+        original_run = run_backtest
+
+        def patched_run(
+            request: BacktestRequest,
+            data_provider: object = None,
+            strategy: Strategy | None = None,
+        ) -> BacktestResponse:
+            return original_run(request, data_provider=provider, strategy=strategy)
+
+        with patch("alphaa.web.routes.run_backtest", side_effect=patched_run), \
+             patch("alphaa.web.routes.STATIC_DIR", tmp_path / "static"), \
+             patch("alphaa.strategies.loader.STRATEGIES_DIR", strat_dir):
+            resp = client.post(
+                "/run",
+                data={
+                    "symbol": "RELIANCE.NS",
+                    "start": "2019-01-01",
+                    "end": "2024-01-01",
+                    "capital": "100000",
+                    "strategy_id": str(sid),
+                    "strategy_params": "{}",
+                },
+                follow_redirects=False,
+            )
+
+        assert resp.status_code == 303
 
 
 class TestGetResult:
@@ -152,3 +220,51 @@ class TestGetLeaderboard:
         assert resp.status_code == 200
         # BBBB should appear before AAAA (higher CAGR)
         assert resp.text.index("BBBB.NS") < resp.text.index("AAAA.NS")
+
+
+class TestStrategiesPage:
+    def test_returns_200(self, tmp_path: Path) -> None:
+        client = _make_client(tmp_path)
+        resp = client.get("/strategies")
+        assert resp.status_code == 200
+        assert "Strategies" in resp.text
+
+    def test_upload_valid_strategy(self, tmp_path: Path) -> None:
+        client = _make_client(tmp_path)
+
+        with patch("alphaa.strategies.loader.STRATEGIES_DIR", tmp_path / "strategies"):
+            resp = client.post(
+                "/strategies/upload",
+                data={"name": "Test Strat", "description": "A test"},
+                files={"file": ("test_strat.py", VALID_STRATEGY_SOURCE.encode(), "text/plain")},
+                follow_redirects=False,
+            )
+
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/strategies"
+
+    def test_upload_invalid_strategy(self, tmp_path: Path) -> None:
+        client = _make_client(tmp_path)
+        bad_source = "import os\ndef build_strategy(**p): pass"
+
+        resp = client.post(
+            "/strategies/upload",
+            data={"name": "Bad", "description": ""},
+            files={"file": ("bad.py", bad_source.encode(), "text/plain")},
+        )
+
+        assert resp.status_code == 200
+        # Should show an error on the strategies page
+        assert "error" in resp.text.lower() or "import" in resp.text.lower()
+
+    def test_upload_non_py_file(self, tmp_path: Path) -> None:
+        client = _make_client(tmp_path)
+
+        resp = client.post(
+            "/strategies/upload",
+            data={"name": "Bad", "description": ""},
+            files={"file": ("readme.txt", b"hello", "text/plain")},
+        )
+
+        assert resp.status_code == 200
+        assert ".py" in resp.text

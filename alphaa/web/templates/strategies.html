@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Strategies — AlphaA{% endblock %}
+
+{% block content %}
+<h1>Strategies</h1>
+
+{% if error %}
+<article aria-label="Error" style="border-left: 4px solid red; padding-left: 1rem;">
+    <p><strong>Error:</strong> {{ error }}</p>
+</article>
+{% endif %}
+
+<h2>Upload a Strategy</h2>
+<form method="post" action="/strategies/upload" enctype="multipart/form-data">
+    <div class="grid">
+        <label>
+            Name
+            <input type="text" name="name" value="{{ name or '' }}" required>
+        </label>
+        <label>
+            Description
+            <input type="text" name="description" value="{{ description or '' }}">
+        </label>
+    </div>
+    <label>
+        Strategy File (.py)
+        <input type="file" name="file" accept=".py" required>
+    </label>
+    <button type="submit">Upload</button>
+</form>
+
+{% if strategies %}
+<h2>Uploaded Strategies</h2>
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Filename</th>
+            <th>Description</th>
+            <th>Uploaded</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in strategies %}
+        <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.name }}</td>
+            <td>{{ s.filename }}</td>
+            <td>{{ s.description }}</td>
+            <td>{{ s.created_at }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% else %}
+<p>No custom strategies uploaded yet.</p>
+{% endif %}
+{% endblock %}
