@@ -11,6 +11,7 @@
         <tr>
             <th>Rank</th>
             <th>Symbol</th>
+            <th>Strategy</th>
             <th>Period</th>
             <th>CAGR</th>
             <th>Total Return</th>
@@ -25,6 +26,7 @@
         <tr>
             <td>{{ loop.index }}</td>
             <td><a href="/result/{{ run.id }}">{{ run.symbol }}</a></td>
+            <td>{{ run.strategy_name }}</td>
             <td>{{ run.start_date[:10] }} — {{ run.end_date[:10] }}</td>
             <td class="{{ 'positive' if run.cagr_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.cagr_pct) }}%</td>
             <td class="{{ 'positive' if run.total_return_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.total_return_pct) }}%</td>
