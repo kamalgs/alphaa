@@ -6,20 +6,13 @@ import argparse
 from datetime import date
 from pathlib import Path
 
-from alphaa.broker.paper import PaperBroker
-from alphaa.conditions.position import has_no_position, has_position, stop_loss
-from alphaa.conditions.price import price_near_52w_high, price_near_52w_low
-from alphaa.core.strategy import Strategy
-from alphaa.core.types import BacktestConfig, DateRange
+from alphaa.core.types import DateRange
 from alphaa.data.cache import CachingProvider
 from alphaa.data.yahoo import YahooFinanceProvider
-from alphaa.engine.backtest import BacktestEngine
-from alphaa.engine.cost_models import ZeroCostModel
-from alphaa.indicators.price import rolling_high, rolling_low
 from alphaa.reporting.charts import plot_equity_curve, plot_trades_on_price
 from alphaa.reporting.cli_output import print_summary
 from alphaa.reporting.csv_export import export_trade_log
-from alphaa.reporting.metrics import compute_metrics
+from alphaa.service.backtest_service import BacktestRequest, run_backtest
 
 
 def parse_args(args: list[str] | None = None) -> argparse.Namespace:
@@ -82,43 +75,21 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 def main(args: list[str] | None = None) -> None:
     parsed = parse_args(args)
 
-    start = date.fromisoformat(parsed.start)
-    end = date.fromisoformat(parsed.end)
-    date_range = DateRange(start, end)
-
-    # --- Data provider ---
-    yahoo = YahooFinanceProvider()
-    provider = CachingProvider(yahoo) if not parsed.no_cache else yahoo
-
-    # --- Strategy ---
-    strategy = Strategy(
-        name="buy-low-sell-high",
-        entry=price_near_52w_low(within_pct=parsed.entry_pct) & has_no_position(),
-        exit=(
-            price_near_52w_high(within_pct=parsed.exit_pct)
-            | stop_loss(pct=parsed.stop_loss)
-        )
-        & has_position(),
-        indicators=[rolling_high(252), rolling_low(252)],
-    )
-
-    # --- Config ---
-    config = BacktestConfig(
-        strategy=strategy,
+    request = BacktestRequest(
         symbol=parsed.symbol,
-        date_range=date_range,
-        starting_capital=parsed.capital,
-        data_provider=provider,
-        broker=PaperBroker(),
-        cost_model=ZeroCostModel(),
+        start_date=date.fromisoformat(parsed.start),
+        end_date=date.fromisoformat(parsed.end),
+        capital=parsed.capital,
+        entry_pct=parsed.entry_pct,
+        exit_pct=parsed.exit_pct,
+        stop_loss_pct=parsed.stop_loss,
+        use_cache=not parsed.no_cache,
     )
 
-    # --- Run ---
-    engine = BacktestEngine()
-    result = engine.run(config)
+    response = run_backtest(request)
+    result = response.result
+    metrics = response.metrics
 
-    # --- Report ---
-    metrics = compute_metrics(result)
     print_summary(metrics, result)
 
     # --- Output files ---
@@ -134,6 +105,9 @@ def main(args: list[str] | None = None) -> None:
         plot_equity_curve(result, output_path=equity_path)
         print(f"  Equity curve: {equity_path}")
 
+        yahoo: YahooFinanceProvider | CachingProvider = YahooFinanceProvider()
+        provider = CachingProvider(yahoo) if request.use_cache else yahoo
+        date_range = DateRange(request.start_date, request.end_date)
         ohlcv = provider.fetch_ohlcv(parsed.symbol, date_range)
         trades_path = output_dir / f"{parsed.symbol}_trades.png"
         plot_trades_on_price(result, ohlcv, output_path=trades_path)

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — AlphaA{% endblock %}
+
+{% block content %}
+<h1>Leaderboard</h1>
+
+{% if runs %}
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>Rank</th>
+            <th>Symbol</th>
+            <th>Period</th>
+            <th>CAGR</th>
+            <th>Total Return</th>
+            <th>Sharpe</th>
+            <th>Drawdown</th>
+            <th>Trades</th>
+            <th>Win Rate</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td><a href="/result/{{ run.id }}">{{ run.symbol }}</a></td>
+            <td>{{ run.start_date[:10] }} — {{ run.end_date[:10] }}</td>
+            <td class="{{ 'positive' if run.cagr_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.cagr_pct) }}%</td>
+            <td class="{{ 'positive' if run.total_return_pct >= 0 else 'negative' }}">{{ "{:+.2f}".format(run.total_return_pct) }}%</td>
+            <td>{{ "{:.2f}".format(run.sharpe_ratio) }}</td>
+            <td>{{ "{:.2f}".format(run.max_drawdown_pct) }}%</td>
+            <td>{{ run.total_trades }}</td>
+            <td>{{ "{:.1f}".format(run.win_rate_pct) }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% else %}
+<p>No backtest runs yet. <a href="/">Run your first backtest!</a></p>
+{% endif %}
+{% endblock %}
