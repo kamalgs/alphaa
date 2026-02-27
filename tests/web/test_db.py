@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from alphaa.web.db import get_db, get_leaderboard, get_run, save_run
+from alphaa.web.db import (
+    delete_strategy,
+    get_db,
+    get_leaderboard,
+    get_run,
+    get_strategy,
+    list_strategies,
+    save_run,
+    save_strategy,
+)
 
 
 def _sample_run_kwargs(symbol: str = "RELIANCE.NS", cagr: float = 12.5) -> dict:  # type: ignore[type-arg]
@@ -38,6 +47,8 @@ class TestDatabase:
         assert row.symbol == "RELIANCE.NS"
         assert row.cagr_pct == 12.5
         assert row.total_trades == 5
+        assert row.strategy_source == "builtin"
+        assert row.strategy_params_json == "{}"
         conn.close()
 
     def test_leaderboard_sorted_by_cagr(self, tmp_path: Path) -> None:
@@ -80,4 +91,71 @@ class TestDatabase:
         assert row is not None
         assert row.equity_chart_path == "/tmp/eq.png"
         assert row.trades_chart_path == "/tmp/tr.png"
+        conn.close()
+
+    def test_strategy_source_stored(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        run_id = save_run(
+            conn,
+            **_sample_run_kwargs(),
+            strategy_source="custom:my_strat.py",
+            strategy_params_json='{"pct": 10}',
+        )
+
+        row = get_run(conn, run_id)
+        assert row is not None
+        assert row.strategy_source == "custom:my_strat.py"
+        assert row.strategy_params_json == '{"pct": 10}'
+        conn.close()
+
+
+class TestStrategyCRUD:
+    def test_save_and_get(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        sid = save_strategy(conn, name="My Strategy", filename="my_strat.py")
+
+        row = get_strategy(conn, sid)
+        assert row is not None
+        assert row.name == "My Strategy"
+        assert row.filename == "my_strat.py"
+        assert row.description == ""
+        conn.close()
+
+    def test_save_with_description(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        sid = save_strategy(
+            conn,
+            name="Described",
+            filename="desc.py",
+            description="A test strategy",
+        )
+        row = get_strategy(conn, sid)
+        assert row is not None
+        assert row.description == "A test strategy"
+        conn.close()
+
+    def test_list_strategies(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        save_strategy(conn, name="First", filename="first.py")
+        save_strategy(conn, name="Second", filename="second.py")
+
+        rows = list_strategies(conn)
+        assert len(rows) == 2
+        conn.close()
+
+    def test_get_strategy_not_found(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        assert get_strategy(conn, 999) is None
+        conn.close()
+
+    def test_delete_strategy(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        sid = save_strategy(conn, name="To Delete", filename="del.py")
+        assert delete_strategy(conn, sid)
+        assert get_strategy(conn, sid) is None
+        conn.close()
+
+    def test_delete_nonexistent(self, tmp_path: Path) -> None:
+        conn = get_db(tmp_path / "test.db")
+        assert not delete_strategy(conn, 999)
         conn.close()

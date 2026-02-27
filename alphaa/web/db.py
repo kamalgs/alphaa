@@ -1,4 +1,4 @@
-"""SQLite persistence for backtest runs."""
+"""SQLite persistence for backtest runs and uploaded strategies."""
 
 from __future__ import annotations
 
@@ -28,7 +28,17 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
     profit_factor REAL NOT NULL,
     benchmark_return_pct REAL,
     equity_chart_path TEXT,
-    trades_chart_path TEXT
+    trades_chart_path TEXT,
+    strategy_source TEXT NOT NULL DEFAULT 'builtin',
+    strategy_params_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS strategies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    filename TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """
 
@@ -60,6 +70,19 @@ class LeaderboardRow:
     benchmark_return_pct: float | None
     equity_chart_path: str | None
     trades_chart_path: str | None
+    strategy_source: str
+    strategy_params_json: str
+
+
+@dataclass(frozen=True)
+class StrategyRow:
+    """Typed row for strategy queries."""
+
+    id: int
+    name: str
+    filename: str
+    description: str
+    created_at: str
 
 
 def get_db(path: Path | None = None) -> sqlite3.Connection:
@@ -68,7 +91,7 @@ def get_db(path: Path | None = None) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute(_SCHEMA)
+    conn.executescript(_SCHEMA)
     conn.commit()
     return conn
 
@@ -95,6 +118,8 @@ def save_run(
     benchmark_return_pct: float | None = None,
     equity_chart_path: str | None = None,
     trades_chart_path: str | None = None,
+    strategy_source: str = "builtin",
+    strategy_params_json: str = "{}",
 ) -> int:
     """Insert a backtest run and return its row id."""
     cursor = conn.execute(
@@ -104,8 +129,9 @@ def save_run(
             entry_pct, exit_pct, stop_loss_pct, strategy_name,
             total_return_pct, cagr_pct, max_drawdown_pct, sharpe_ratio,
             win_rate_pct, total_trades, avg_holding_days, profit_factor,
-            benchmark_return_pct, equity_chart_path, trades_chart_path
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            benchmark_return_pct, equity_chart_path, trades_chart_path,
+            strategy_source, strategy_params_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             symbol, start_date, end_date, capital,
@@ -113,6 +139,7 @@ def save_run(
             total_return_pct, cagr_pct, max_drawdown_pct, sharpe_ratio,
             win_rate_pct, total_trades, avg_holding_days, profit_factor,
             benchmark_return_pct, equity_chart_path, trades_chart_path,
+            strategy_source, strategy_params_json,
         ),
     )
     conn.commit()
@@ -139,3 +166,56 @@ def get_run(conn: sqlite3.Connection, run_id: int) -> LeaderboardRow | None:
     if row is None:
         return None
     return LeaderboardRow(*row)
+
+
+# --- Strategy CRUD ---
+
+
+def save_strategy(
+    conn: sqlite3.Connection,
+    *,
+    name: str,
+    filename: str,
+    description: str = "",
+) -> int:
+    """Insert a strategy record and return its row id."""
+    cursor = conn.execute(
+        """\
+        INSERT INTO strategies (name, filename, description)
+        VALUES (?, ?, ?)
+        """,
+        (name, filename, description),
+    )
+    conn.commit()
+    assert cursor.lastrowid is not None
+    return cursor.lastrowid
+
+
+def list_strategies(conn: sqlite3.Connection) -> list[StrategyRow]:
+    """Return all strategies ordered by creation date (newest first)."""
+    cursor = conn.execute(
+        "SELECT * FROM strategies ORDER BY created_at DESC",
+    )
+    return [StrategyRow(*row) for row in cursor.fetchall()]
+
+
+def get_strategy(conn: sqlite3.Connection, strategy_id: int) -> StrategyRow | None:
+    """Return a single strategy by id, or None if not found."""
+    cursor = conn.execute(
+        "SELECT * FROM strategies WHERE id = ?",
+        (strategy_id,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return StrategyRow(*row)
+
+
+def delete_strategy(conn: sqlite3.Connection, strategy_id: int) -> bool:
+    """Delete a strategy by id. Returns True if a row was deleted."""
+    cursor = conn.execute(
+        "DELETE FROM strategies WHERE id = ?",
+        (strategy_id,),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
