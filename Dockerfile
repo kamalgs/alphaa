@@ -13,4 +13,4 @@ COPY alphaa/ alphaa/
 RUN pip install --no-cache-dir --no-deps .
 
 EXPOSE 8000
-CMD ["uvicorn", "alphaa.web.app:create_app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["opentelemetry-instrument", "uvicorn", "alphaa.web.app:create_app", "--host", "0.0.0.0", "--port", "8000"]

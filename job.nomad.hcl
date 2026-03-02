@@ -13,8 +13,18 @@ job "alphaa" {
       driver = "docker"
 
       config {
-        image      = "alphaa:local"
-        network_mode   = "host"
+        image        = "alphaa:local"
+        network_mode = "host"
+      }
+
+      env {
+        OTEL_SERVICE_NAME                = "alphaa"
+        OTEL_EXPORTER_OTLP_ENDPOINT      = "http://localhost:4318"
+        OTEL_EXPORTER_OTLP_PROTOCOL      = "http/protobuf"
+        OTEL_LOGS_EXPORTER               = "otlp"
+        OTEL_METRICS_EXPORTER            = "otlp"
+        OTEL_TRACES_EXPORTER             = "otlp"
+        OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED = "true"
       }
 
       resources {
