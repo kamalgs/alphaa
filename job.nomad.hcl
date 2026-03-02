@@ -13,8 +13,8 @@ job "alphaa" {
       driver = "docker"
 
       config {
-        image        = "alphaa:latest"
-        network_mode = "host"
+        image      = "alphaa:local"
+        network_mode   = "host"
       }
 
       resources {
